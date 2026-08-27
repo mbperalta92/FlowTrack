@@ -1,0 +1,139 @@
+.users-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+}
+
+.users-container {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 30px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.users-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.users-list-wrapper {
+  overflow-x: auto;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.users-table th, .users-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.users-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.005);
+}
+
+.user-name-cell {
+  color: var(--text-primary);
+}
+
+.self-badge {
+  margin-left: 8px;
+  font-size: 0.7rem;
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold-light);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.role-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 50px;
+  display: inline-block;
+}
+
+.role-key_user { background: rgba(201, 168, 76, 0.15); color: var(--gold-light); }
+.role-admin { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+.role-technician { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+.role-both { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+
+.muted-text {
+  color: var(--text-muted);
+}
+
+.actions-cell {
+  vertical-align: middle;
+}
+
+.actions-cell button {
+  margin-right: 12px;
+}
+
+.actions-cell button:last-child {
+  margin-right: 0;
+}
+
+.btn-table-edit {
+  color: var(--gold-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.btn-table-edit:hover {
+  color: var(--gold-light);
+  text-decoration: underline;
+}
+
+.btn-table-delete {
+  color: var(--error);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.btn-table-delete:hover {
+  color: #fca5a5;
+  text-decoration: underline;
+}
+
+/* MODAL & FORM */
+.user-modal {
+  width: 90%;
+  max-width: 600px;
+}
+
+.user-form {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .users-container {
+    padding: 20px 16px;
+  }
+  .users-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
