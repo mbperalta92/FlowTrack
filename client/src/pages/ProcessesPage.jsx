@@ -356,6 +356,16 @@ export default function ProcessesPage() {
             </button>
             
             <div className="export-import-group" data-tour="export-import-actions" style={{ display: 'flex', gap: '8px' }}>
+              <a
+                href="https://drive.google.com/drive/folders/1Y6WnQmk0a8ojNGN3tzE3rPFCLXTU49gC"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline drive-main-btn"
+                title="Abrir Pasta Geral da REPFIX no Google Drive (geral@repfix.pt)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                📁 Google Drive
+              </a>
               <button 
                 className="btn btn-outline export-btn"
                 onClick={() => {

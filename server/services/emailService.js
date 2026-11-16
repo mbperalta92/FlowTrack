@@ -1,4 +1,11 @@
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Create a transporter. For development/testing, we'll use Ethereal Email if no SMTP config is provided.
 let transporter;
@@ -50,7 +57,7 @@ export async function sendEmail(to, subject, text, html) {
     if (!transporter) await initTransporter();
 
     let info = await transporter.sendMail({
-      from: '"FlowTrack Notificações" <noreply@repfix.pt>',
+      from: process.env.SMTP_FROM || '"FlowTrack Notificações" <noreply@repfix.pt>',
       to,
       subject,
       text,

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import db from '../database/init.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { findOrCreateProcessFolder, uploadFileToDrive } from '../services/googleDriveService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,13 +103,13 @@ router.get('/:id/history', authenticateToken, (req, res) => {
  * Add a comment with optional file attachments.
  * Any authenticated user can comment on any process.
  */
-router.post('/:id/history', authenticateToken, attachmentUpload.array('files', 10), (req, res) => {
+router.post('/:id/history', authenticateToken, attachmentUpload.array('files', 10), async (req, res) => {
   try {
     const processId = req.params.id;
     const { comment } = req.body;
 
     // Verify process exists
-    const process = db.prepare('SELECT id FROM processes WHERE id = ?').get(processId);
+    const process = db.prepare('SELECT id, process_id, client, google_drive_folder_id, google_drive_folder_url FROM processes WHERE id = ?').get(processId);
     if (!process) {
       return res.status(404).json({ error: 'Processo não encontrado.' });
     }
@@ -126,21 +127,58 @@ router.post('/:id/history', authenticateToken, attachmentUpload.array('files', 1
 
     const historyId = historyResult.lastInsertRowid;
 
-    // Insert attachments
+    // Insert attachments & sync with Google Drive if credentials are configured
     const attachments = [];
     if (req.files && req.files.length > 0) {
+      let targetFolderId = process.google_drive_folder_id;
+
+      // Ensure process has a Google Drive subfolder if credentials exist
+      const driveFolder = await findOrCreateProcessFolder(
+        process.process_id,
+        process.client,
+        process.google_drive_folder_id
+      );
+
+      if (driveFolder.folderId && driveFolder.folderId !== process.google_drive_folder_id) {
+        targetFolderId = driveFolder.folderId;
+        db.prepare(`
+          UPDATE processes
+          SET google_drive_folder_id = ?, google_drive_folder_url = ?
+          WHERE id = ?
+        `).run(driveFolder.folderId, driveFolder.folderUrl, process.id);
+      }
+
       const attachStmt = db.prepare(`
-        INSERT INTO attachments (history_id, filename, original_name, mime_type, size)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO attachments (history_id, filename, original_name, mime_type, size, google_drive_file_id, google_drive_file_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const file of req.files) {
-        attachStmt.run(historyId, file.filename, file.originalname, file.mimetype, file.size);
+        const localFilePath = path.join(attachmentsDir, file.filename);
+        const driveUpload = await uploadFileToDrive(
+          targetFolderId,
+          localFilePath,
+          file.originalname,
+          file.mimetype
+        );
+
+        attachStmt.run(
+          historyId,
+          file.filename,
+          file.originalname,
+          file.mimetype,
+          file.size,
+          driveUpload.driveFileId,
+          driveUpload.driveFileUrl
+        );
+
         attachments.push({
           filename: file.filename,
           original_name: file.originalname,
           mime_type: file.mimetype,
-          size: file.size
+          size: file.size,
+          google_drive_file_id: driveUpload.driveFileId,
+          google_drive_file_url: driveUpload.driveFileUrl
         });
       }
     }

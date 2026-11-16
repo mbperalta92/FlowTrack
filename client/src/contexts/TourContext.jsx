@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { Joyride, STATUS } from 'react-joyride';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
@@ -243,6 +243,21 @@ export function TourProvider({ children }) {
     }, 150);
   }, [location.pathname, navigate, allPotentialSteps]);
 
+  // Auto-start guided tour on first visit for each user
+  useEffect(() => {
+    if (!user || !user.id || location.pathname !== '/processos') return;
+    const storageKey = `flowtrack_tour_completed_${user.id}`;
+    const alreadyCompleted = localStorage.getItem(storageKey);
+
+    if (!alreadyCompleted) {
+      const timer = setTimeout(() => {
+        localStorage.setItem(storageKey, 'true');
+        startTour();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [user, location.pathname, startTour]);
+
   const handleJoyrideCallback = (data) => {
     const { status, type, index, action } = data;
     const finishedStatuses = [STATUS.FINISHED, STATUS.SKIPPED];
@@ -260,6 +275,9 @@ export function TourProvider({ children }) {
     }
 
     if (finishedStatuses.includes(status)) {
+      if (user?.id) {
+        localStorage.setItem(`flowtrack_tour_completed_${user.id}`, 'true');
+      }
       setRun(false);
     } else if (type === 'step:after') {
       const nextIndex = index + (action === 'prev' ? -1 : 1);

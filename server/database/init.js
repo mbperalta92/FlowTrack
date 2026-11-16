@@ -46,6 +46,47 @@ export function initializeDatabase() {
       db.exec("ALTER TABLE processes ADD COLUMN address TEXT");
       console.log('✅ Added address column to processes table');
     }
+    const hasDriveId = tableInfo.some(col => col.name === 'google_drive_folder_id');
+    if (!hasDriveId) {
+      db.exec("ALTER TABLE processes ADD COLUMN google_drive_folder_id TEXT");
+      console.log('✅ Added google_drive_folder_id column to processes table');
+    }
+    const hasDriveUrl = tableInfo.some(col => col.name === 'google_drive_folder_url');
+    if (!hasDriveUrl) {
+      db.exec("ALTER TABLE processes ADD COLUMN google_drive_folder_url TEXT");
+      console.log('✅ Added google_drive_folder_url column to processes table');
+    }
+    const hasCalEventId = tableInfo.some(col => col.name === 'google_calendar_event_id');
+    if (!hasCalEventId) {
+      db.exec("ALTER TABLE processes ADD COLUMN google_calendar_event_id TEXT");
+      console.log('✅ Added google_calendar_event_id column to processes table');
+    }
+
+    const attTableInfo = db.prepare("PRAGMA table_info(attachments)").all();
+    const hasAttDriveId = attTableInfo.some(col => col.name === 'google_drive_file_id');
+    if (!hasAttDriveId) {
+      db.exec("ALTER TABLE attachments ADD COLUMN google_drive_file_id TEXT");
+      console.log('✅ Added google_drive_file_id column to attachments table');
+    }
+    const hasAttDriveUrl = attTableInfo.some(col => col.name === 'google_drive_file_url');
+    if (!hasAttDriveUrl) {
+      db.exec("ALTER TABLE attachments ADD COLUMN google_drive_file_url TEXT");
+      console.log('✅ Added google_drive_file_url column to attachments table');
+    }
+
+    const evtTableInfo = db.prepare("PRAGMA table_info(events)").all();
+    const hasEvtProcId = evtTableInfo.some(col => col.name === 'process_id');
+    if (!hasEvtProcId) {
+      db.exec("ALTER TABLE events ADD COLUMN process_id INTEGER REFERENCES processes(id) ON DELETE CASCADE");
+      console.log('✅ Added process_id column to events table');
+    }
+
+    const userTableInfo = db.prepare("PRAGMA table_info(users)").all();
+    const hasUserPhone = userTableInfo.some(col => col.name === 'phone');
+    if (!hasUserPhone) {
+      db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+      console.log('✅ Added phone column to users table');
+    }
   } catch (err) {
     console.error('Error checking/adding columns:', err);
   }

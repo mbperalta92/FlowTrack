@@ -7,10 +7,10 @@
 
 .users-container {
   flex: 1;
-  max-width: 1200px;
+  max-width: 100%;
   width: 100%;
-  margin: 0 auto;
-  padding: 30px 24px;
+  margin: 0;
+  padding: 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 24px;

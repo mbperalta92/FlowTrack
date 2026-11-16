@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   full_name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
+  phone TEXT,
   birth_date TEXT,
   address TEXT,
   nif TEXT,
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS processes (
   open_date TEXT DEFAULT (datetime('now')),
   schedule_date TEXT,
   next_intervention_date TEXT,
+  google_drive_folder_id TEXT,
+  google_drive_folder_url TEXT,
+  google_calendar_event_id TEXT,
   created_by INTEGER REFERENCES users(id),
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -54,6 +58,8 @@ CREATE TABLE IF NOT EXISTS attachments (
   original_name TEXT NOT NULL,
   mime_type TEXT,
   size INTEGER,
+  google_drive_file_id TEXT,
+  google_drive_file_url TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -63,6 +69,7 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   event_date TEXT NOT NULL,
   event_time TEXT,
+  process_id INTEGER REFERENCES processes(id) ON DELETE CASCADE,
   created_by INTEGER NOT NULL REFERENCES users(id),
   created_at TEXT DEFAULT (datetime('now'))
 );

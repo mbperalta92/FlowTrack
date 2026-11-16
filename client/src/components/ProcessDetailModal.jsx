@@ -246,6 +246,16 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
             {isOverdue && <span className="overdue-warning-tag">⚠️ INTERVENÇÃO ATRASADA</span>}
           </div>
           <div className="header-right">
+            <a
+              href={proc.google_drive_folder_url || `https://drive.google.com/drive/folders/1Y6WnQmk0a8ojNGN3tzE3rPFCLXTU49gC`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline drive-modal-btn"
+              title={`Abrir Pasta na Google Drive (${proc.process_id}_${proc.client})`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '6px 14px' }}
+            >
+              📁 Google Drive ({proc.process_id}_{proc.client})
+            </a>
             {saving && <span className="saving-indicator">A guardar...</span>}
             <button className="close-btn" onClick={onClose}>&times;</button>
           </div>
@@ -415,21 +425,21 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
                   <input
                     type="date"
                     className="input-field"
-                    value={parseDatePart(proc.schedule_date)}
+                    value={parseDatePart(proc.schedule_date || proc.next_intervention_date)}
                     disabled={!canEditFullProcess && !canTechnicianEditMilestone}
                     onChange={e => {
                       const newDate = e.target.value;
-                      const timePart = parseTimePart(proc.schedule_date);
+                      const timePart = parseTimePart(proc.schedule_date) || parseTimePart(proc.next_intervention_date);
                       handleFieldChange('schedule_date', combineDateTime(newDate, timePart));
                     }}
                     style={{ flex: 2 }}
                   />
                   <InlineTimePicker
                     className="input-field"
-                    value={parseTimePart(proc.schedule_date)}
+                    value={parseTimePart(proc.schedule_date) || parseTimePart(proc.next_intervention_date)}
                     disabled={!canEditFullProcess && !canTechnicianEditMilestone}
                     onSave={newTime => {
-                      const datePart = parseDatePart(proc.schedule_date) || new Date().toISOString().split('T')[0];
+                      const datePart = parseDatePart(proc.schedule_date || proc.next_intervention_date) || new Date().toISOString().split('T')[0];
                       handleFieldChange('schedule_date', combineDateTime(datePart, newTime));
                     }}
                     style={{ flex: 1 }}

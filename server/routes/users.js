@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../database/init.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { syncProcessToGoogleCalendar } from '../services/googleDriveService.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const VALID_ROLES = ['key_user', 'admin', 'technician', 'both'];
 router.get('/', authenticateToken, (req, res) => {
   try {
     let sql = `
-      SELECT id, username, full_name, email, birth_date, address, nif, role, created_at, updated_at
+      SELECT id, username, full_name, email, phone, birth_date, address, nif, role, created_at, updated_at
       FROM users
     `;
     const params = [];
@@ -53,7 +54,7 @@ router.get('/', authenticateToken, (req, res) => {
  */
 router.post('/', authenticateToken, requireRole('key_user'), (req, res) => {
   try {
-    const { username, password, full_name, email, birth_date, address, nif, role } = req.body;
+    const { username, password, full_name, email, phone, birth_date, address, nif, role } = req.body;
 
     // Validate required fields
     if (!username || !password || !full_name || !email || !role) {
@@ -102,14 +103,14 @@ router.post('/', authenticateToken, requireRole('key_user'), (req, res) => {
     const passwordHash = bcrypt.hashSync(password, salt);
 
     const stmt = db.prepare(`
-      INSERT INTO users (username, password_hash, full_name, email, birth_date, address, nif, role)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (username, password_hash, full_name, email, phone, birth_date, address, nif, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(username, passwordHash, full_name, email, birth_date || null, address || null, nif || null, role);
+    const result = stmt.run(username, passwordHash, full_name, email, phone || null, birth_date || null, address || null, nif || null, role);
 
     const newUser = db.prepare(`
-      SELECT id, username, full_name, email, birth_date, address, nif, role, created_at, updated_at
+      SELECT id, username, full_name, email, phone, birth_date, address, nif, role, created_at, updated_at
       FROM users WHERE id = ?
     `).get(result.lastInsertRowid);
 
@@ -130,7 +131,7 @@ router.post('/', authenticateToken, requireRole('key_user'), (req, res) => {
 router.get('/:id', authenticateToken, (req, res) => {
   try {
     const user = db.prepare(`
-      SELECT id, username, full_name, email, birth_date, address, nif, role, created_at, updated_at
+      SELECT id, username, full_name, email, phone, birth_date, address, nif, role, created_at, updated_at
       FROM users WHERE id = ?
     `).get(req.params.id);
 
@@ -167,7 +168,7 @@ router.put('/:id', authenticateToken, (req, res) => {
       return res.status(404).json({ error: 'Utilizador não encontrado.' });
     }
 
-    const { username, password, full_name, email, birth_date, address, nif, role } = req.body;
+    const { username, password, full_name, email, phone, birth_date, address, nif, role } = req.body;
 
     // Only key_user can change roles
     if (role && role !== existing.role) {
@@ -215,6 +216,7 @@ router.put('/:id', authenticateToken, (req, res) => {
         password_hash = ?,
         full_name = ?,
         email = ?,
+        phone = ?,
         birth_date = ?,
         address = ?,
         nif = ?,
@@ -228,6 +230,7 @@ router.put('/:id', authenticateToken, (req, res) => {
       passwordHash,
       full_name || existing.full_name,
       email || existing.email,
+      phone !== undefined ? phone : existing.phone,
       birth_date !== undefined ? birth_date : existing.birth_date,
       address !== undefined ? address : existing.address,
       nif !== undefined ? nif : existing.nif,
@@ -236,9 +239,24 @@ router.put('/:id', authenticateToken, (req, res) => {
     );
 
     const updated = db.prepare(`
-      SELECT id, username, full_name, email, birth_date, address, nif, role, created_at, updated_at
+      SELECT id, username, full_name, email, phone, birth_date, address, nif, role, created_at, updated_at
       FROM users WHERE id = ?
     `).get(userId);
+
+    // Sync any open processes assigned to this user so Google Calendar reflects new name/phone/email
+    try {
+      const userProcs = db.prepare(`
+        SELECT p.*, u.full_name AS technician_name, u.email AS technician_email, u.phone AS technician_phone, m.full_name AS manager_name
+        FROM processes p
+        LEFT JOIN users u ON p.technician_id = u.id
+        LEFT JOIN users m ON p.manager_id = m.id
+        WHERE p.status = 'ABERTO' AND (p.technician_id = ? OR p.manager_id = ?)
+      `).all(userId, userId);
+
+      for (const proc of userProcs) {
+        syncProcessToGoogleCalendar(proc).catch(() => {});
+      }
+    } catch {}
 
     res.json({
       ...updated,

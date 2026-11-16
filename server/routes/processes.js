@@ -8,6 +8,7 @@ import { ZipArchive } from 'archiver';
 import db from '../database/init.js';
 import { authenticateToken, requireRole, canEditProcess } from '../middleware/auth.js';
 import { sendEmail } from '../services/emailService.js';
+import { createProcessFolder, findOrCreateProcessFolder, formatProcessFolderName, PARENT_FOLDER_ID, syncProcessToGoogleCalendar, syncProcessDriveFolderState } from '../services/googleDriveService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,38 +76,99 @@ function generateProcessId(type) {
 }
 
 /**
- * Create notifications for milestone changes and technician assignments.
+ * Create notifications for milestone changes (only for the assigned manager).
  */
-function createMilestoneNotifications(processId, processDisplayId, newMilestone) {
-  if (newMilestone === 'SUPERVISÃO') {
-    // Notify all admin and key_user users
-    const admins = db.prepare(`
-      SELECT id, email, full_name FROM users WHERE role IN ('key_user', 'admin', 'both')
-    `).all();
+function createMilestoneNotifications(processId, processDisplayId, newMilestone, assignedManagerId) {
+  if (newMilestone === 'SUPERVISÃO' && assignedManagerId) {
+    const manager = db.prepare(`
+      SELECT id, email, full_name FROM users WHERE id = ?
+    `).get(assignedManagerId);
 
-    const notifStmt = db.prepare(`
-      INSERT INTO notifications (user_id, type, title, message, process_id)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    for (const admin of admins) {
-      notifStmt.run(
-        admin.id,
+    if (manager) {
+      db.prepare(`
+        INSERT INTO notifications (user_id, type, title, message, process_id)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        manager.id,
         'milestone_supervisao',
         'Processo em Supervisão',
         `O processo ${processDisplayId} avançou para a fase de SUPERVISÃO.`,
         processId
       );
-      
-      // Send Email
-      if (admin.email) {
+
+      if (manager.email) {
         sendEmail(
-          admin.email,
+          manager.email,
           `REPFIX - Processo em Supervisão (${processDisplayId})`,
-          `Olá ${admin.full_name},\n\nO processo ${processDisplayId} avançou para a fase de SUPERVISÃO.\nPor favor, verifique a plataforma FlowTrack para mais detalhes.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
+          `Olá ${manager.full_name},\n\nO processo ${processDisplayId} avançou para a fase de SUPERVISÃO.\nPor favor, verifique a plataforma FlowTrack para mais detalhes.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
         );
       }
     }
+  }
+}
+
+/**
+ * Automatically create or update a Calendar Event whenever an intervention/schedule is marked on a process.
+ * Includes Process ID/Name, Technician Name, and Address/Locality.
+ * Also syncs directly to Google Calendar!
+ */
+export async function syncProcessInterventionEvent(proc, actorUserId) {
+  try {
+    const rawDate = proc.next_intervention_date || proc.schedule_date;
+    if (!rawDate || proc.status === 'FECHADO') {
+      db.prepare('DELETE FROM events WHERE process_id = ?').run(proc.id);
+      await syncProcessToGoogleCalendar(proc);
+      return;
+    }
+
+    const datePart = rawDate.split('T')[0];
+    const timePart = (proc.schedule_date && proc.schedule_date.includes('T'))
+      ? proc.schedule_date.split('T')[1].substring(0, 5)
+      : (rawDate.includes('T') ? rawDate.split('T')[1].substring(0, 5) : null);
+
+    const techName = proc.technician_name || 'Sem Técnico';
+    const techContact = [proc.technician_phone, proc.technician_email].filter(Boolean).join(' | ') || 'Sem contacto';
+    const locationText = proc.address || proc.client || 'Sem Localidade';
+    const eventTitle = `Interv: ${proc.process_id} | 👤 ${techName} | 📍 ${locationText}`;
+    const eventDesc = `Processo: ${proc.process_id} (${proc.client})\nTécnico: ${techName} (${techContact})\nLocalidade/Morada: ${proc.address || 'Não definida'}`;
+
+    const existingEvent = db.prepare('SELECT id FROM events WHERE process_id = ?').get(proc.id);
+    let eventId;
+
+    if (existingEvent) {
+      eventId = existingEvent.id;
+      db.prepare(`
+        UPDATE events
+        SET title = ?, description = ?, event_date = ?, event_time = ?
+        WHERE id = ?
+      `).run(eventTitle, eventDesc, datePart, timePart, eventId);
+      db.prepare('DELETE FROM event_participants WHERE event_id = ?').run(eventId);
+    } else {
+      const creatorId = actorUserId || proc.manager_id || proc.created_by || 1;
+      const res = db.prepare(`
+        INSERT INTO events (title, description, event_date, event_time, process_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(eventTitle, eventDesc, datePart, timePart, proc.id, creatorId);
+      eventId = res.lastInsertRowid;
+    }
+
+    // Add Technician and Manager as participants so both see the event
+    const participantIds = new Set();
+    if (proc.technician_id) participantIds.add(proc.technician_id);
+    if (proc.manager_id) participantIds.add(proc.manager_id);
+
+    const addPartStmt = db.prepare('INSERT INTO event_participants (event_id, user_id) VALUES (?, ?)');
+    for (const uid of participantIds) {
+      addPartStmt.run(eventId, uid);
+    }
+
+    // Sync to Google Calendar (primary calendar of geral@repfix.pt)
+    const gcalEventId = await syncProcessToGoogleCalendar(proc);
+    if (gcalEventId && gcalEventId !== proc.google_calendar_event_id) {
+      db.prepare('UPDATE processes SET google_calendar_event_id = ? WHERE id = ?').run(gcalEventId, proc.id);
+    }
+  } catch (err) {
+    console.error('Error syncing process intervention calendar event:', err);
   }
 }
 
@@ -147,6 +209,8 @@ router.get('/', authenticateToken, (req, res) => {
       SELECT
         p.*,
         u.full_name AS technician_name,
+        u.email AS technician_email,
+        u.phone AS technician_phone,
         m.full_name AS manager_name,
         c.full_name AS created_by_name
       FROM processes p
@@ -205,7 +269,7 @@ router.get('/', authenticateToken, (req, res) => {
  * POST /api/processes
  * Create a new process (admin/key_user only).
  */
-router.post('/', authenticateToken, requireRole('admin', 'key_user'), (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'key_user'), async (req, res) => {
   try {
     const {
       type = 'PROC',
@@ -270,9 +334,12 @@ router.post('/', authenticateToken, requireRole('admin', 'key_user'), (req, res)
     // Generate process_id
     const processId = generateProcessId(type);
 
+    // Create Google Drive folder ("ID_Cliente")
+    const driveInfo = await createProcessFolder(processId, client);
+
     const stmt = db.prepare(`
-      INSERT INTO processes (process_id, type, parent_id, client, client_code, address, description, technician_id, manager_id, priority, milestone, schedule_date, next_intervention_date, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO processes (process_id, type, parent_id, client, client_code, address, description, technician_id, manager_id, priority, milestone, schedule_date, next_intervention_date, google_drive_folder_id, google_drive_folder_url, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -289,6 +356,8 @@ router.post('/', authenticateToken, requireRole('admin', 'key_user'), (req, res)
       milestone,
       schedule_date || null,
       final_next_intervention_date || null,
+      driveInfo.folderId || null,
+      driveInfo.folderUrl || null,
       req.user.id
     );
 
@@ -307,7 +376,7 @@ router.post('/', authenticateToken, requireRole('admin', 'key_user'), (req, res)
 
     // Fetch the created process with joins
     const newProcess = db.prepare(`
-      SELECT p.*, u.full_name AS technician_name, m.full_name AS manager_name, c.full_name AS created_by_name
+      SELECT p.*, u.full_name AS technician_name, u.email AS technician_email, u.phone AS technician_phone, m.full_name AS manager_name, c.full_name AS created_by_name
       FROM processes p
       LEFT JOIN users u ON p.technician_id = u.id
       LEFT JOIN users m ON p.manager_id = m.id
@@ -315,10 +384,40 @@ router.post('/', authenticateToken, requireRole('admin', 'key_user'), (req, res)
       WHERE p.id = ?
     `).get(newId);
 
+    // Sync intervention calendar event if scheduled
+    await syncProcessInterventionEvent(newProcess, req.user.id);
+
     res.status(201).json(newProcess);
   } catch (err) {
     console.error('Create process error:', err);
     res.status(500).json({ error: 'Erro ao criar processo.' });
+  }
+});
+
+/**
+ * POST /api/processes/:id/google-drive
+ * Manually trigger/ensure creation of Google Drive folder for an existing process.
+ */
+router.post('/:id/google-drive', authenticateToken, async (req, res) => {
+  try {
+    const process = db.prepare('SELECT * FROM processes WHERE id = ?').get(req.params.id);
+    if (!process) {
+      return res.status(404).json({ error: 'Processo não encontrado.' });
+    }
+
+    const driveInfo = await createProcessFolder(process.process_id, process.client);
+
+    db.prepare(`
+      UPDATE processes
+      SET google_drive_folder_id = ?, google_drive_folder_url = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(driveInfo.folderId || null, driveInfo.folderUrl || null, process.id);
+
+    const updated = db.prepare('SELECT * FROM processes WHERE id = ?').get(process.id);
+    res.json({ message: 'Pasta na Google Drive sincronizada.', process: updated, driveInfo });
+  } catch (err) {
+    console.error('Error syncing Google Drive folder:', err);
+    res.status(500).json({ error: 'Erro ao sincronizar pasta na Google Drive.' });
   }
 });
 
@@ -430,13 +529,14 @@ router.post('/import', authenticateToken, requireRole('admin', 'key_user'), impo
  * GET /api/processes/:id
  * Get full process details including technician info and parent process info.
  */
-router.get('/:id', authenticateToken, (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const process = db.prepare(`
       SELECT
         p.*,
         u.full_name AS technician_name,
         u.email AS technician_email,
+        u.phone AS technician_phone,
         m.full_name AS manager_name,
         m.email AS manager_email,
         c.full_name AS created_by_name,
@@ -453,6 +553,20 @@ router.get('/:id', authenticateToken, (req, res) => {
 
     if (!process) {
       return res.status(404).json({ error: 'Processo não encontrado.' });
+    }
+
+    // Ensure Google Drive subfolder exists even for older processes
+    if (!process.google_drive_folder_id) {
+      const driveInfo = await findOrCreateProcessFolder(process.process_id, process.client);
+      if (driveInfo.folderId) {
+        db.prepare(`
+          UPDATE processes
+          SET google_drive_folder_id = ?, google_drive_folder_url = ?
+          WHERE id = ?
+        `).run(driveInfo.folderId, driveInfo.folderUrl, process.id);
+        process.google_drive_folder_id = driveInfo.folderId;
+        process.google_drive_folder_url = driveInfo.folderUrl;
+      }
     }
 
     // Get child processes
@@ -472,7 +586,7 @@ router.get('/:id', authenticateToken, (req, res) => {
  * PUT /api/processes/:id
  * Update process with permission checks and history tracking.
  */
-router.put('/:id', authenticateToken, canEditProcess, (req, res) => {
+router.put('/:id', authenticateToken, canEditProcess, async (req, res) => {
   try {
     const process = req.process;
     let {
@@ -484,8 +598,15 @@ router.put('/:id', authenticateToken, canEditProcess, (req, res) => {
 
     let final_schedule = schedule_date !== undefined ? schedule_date : process.schedule_date;
     let final_next_int = next_intervention_date !== undefined ? next_intervention_date : process.next_intervention_date;
-    
-    if (!final_next_int && final_schedule) {
+
+    // Keep schedule_date and next_intervention_date synchronized when either is changed
+    if (schedule_date !== undefined && next_intervention_date === undefined) {
+      final_next_int = schedule_date;
+    } else if (next_intervention_date !== undefined && schedule_date === undefined && process.schedule_date) {
+      const existingTime = process.schedule_date.includes('T') ? process.schedule_date.split('T')[1] : null;
+      const newDateOnly = next_intervention_date ? next_intervention_date.split('T')[0] : null;
+      final_schedule = newDateOnly ? (existingTime ? `${newDateOnly}T${existingTime}` : newDateOnly) : null;
+    } else if (!final_next_int && final_schedule) {
       final_next_int = final_schedule;
     }
 
@@ -571,14 +692,16 @@ router.put('/:id', authenticateToken, canEditProcess, (req, res) => {
       historyEntries.push({ type: 'priority_change', old: process.priority, new: priority });
     }
 
-    if (schedule_date !== undefined && schedule_date !== process.schedule_date) {
-      updates.schedule_date = schedule_date;
-      historyEntries.push({ type: 'date_change', old: process.schedule_date || 'N/A', new: schedule_date || 'N/A' });
+    if (final_schedule !== undefined && final_schedule !== process.schedule_date) {
+      updates.schedule_date = final_schedule;
+      historyEntries.push({ type: 'date_change', old: process.schedule_date || 'N/A', new: final_schedule || 'N/A' });
     }
 
     if (final_next_int !== undefined && final_next_int !== process.next_intervention_date) {
       updates.next_intervention_date = final_next_int;
-      historyEntries.push({ type: 'date_change', old: process.next_intervention_date, new: final_next_int, comment: 'Próxima intervenção alterada' });
+      if (schedule_date === undefined) {
+        historyEntries.push({ type: 'date_change', old: process.next_intervention_date, new: final_next_int, comment: 'Próxima intervenção alterada' });
+      }
     }
 
     if (type !== undefined && type !== process.type) {
@@ -624,37 +747,37 @@ router.put('/:id', authenticateToken, canEditProcess, (req, res) => {
       historyStmt.run(process.id, req.user.id, entry.type, entry.old, entry.new, entry.comment || null);
     }
 
-    // Notifications
+    // Notifications (strictly to the assigned manager of the process)
+    const effectiveManagerId = updates.manager_id !== undefined ? updates.manager_id : process.manager_id;
+
     if (updates.milestone === 'SUPERVISÃO') {
-      createMilestoneNotifications(process.id, process.process_id, 'SUPERVISÃO');
+      createMilestoneNotifications(process.id, process.process_id, 'SUPERVISÃO', effectiveManagerId);
     }
 
-    if (updates.milestone === 'ELABORAÇÃO' && req.user.role === 'technician') {
-      const adminsAndKeyUsers = db.prepare(`
-        SELECT id, email, full_name FROM users WHERE role IN ('key_user', 'admin', 'both')
-      `).all();
+    if (updates.milestone === 'ELABORAÇÃO' && req.user.role === 'technician' && effectiveManagerId) {
+      const assignedManager = db.prepare(`
+        SELECT id, email, full_name FROM users WHERE id = ?
+      `).get(effectiveManagerId);
 
-      const notifStmt = db.prepare(`
-        INSERT INTO notifications (user_id, type, title, message, process_id)
-        VALUES (?, ?, ?, ?, ?)
-      `);
+      if (assignedManager) {
+        const messageText = `O Técnico ${req.user.full_name} concluiu a fase de campo do Processo ${process.process_id} e passou-o para Elaboração.`;
 
-      const messageText = `O Técnico ${req.user.full_name} concluiu a fase de campo do Processo ${process.process_id} e passou-o para Elaboração.`;
-
-      for (const recipient of adminsAndKeyUsers) {
-        notifStmt.run(
-          recipient.id,
+        db.prepare(`
+          INSERT INTO notifications (user_id, type, title, message, process_id)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          assignedManager.id,
           'milestone_elaboracao',
           'Fase de Campo Concluída',
           messageText,
           process.id
         );
 
-        if (recipient.email) {
+        if (assignedManager.email) {
           sendEmail(
-            recipient.email,
+            assignedManager.email,
             `REPFIX - Fase de Campo Concluída (${process.process_id})`,
-            `Olá ${recipient.full_name},\n\n${messageText}\nPor favor, verifique a plataforma FlowTrack.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
+            `Olá ${assignedManager.full_name},\n\n${messageText}\nPor favor, verifique a plataforma FlowTrack.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
           );
         }
       }
@@ -670,13 +793,30 @@ router.put('/:id', authenticateToken, canEditProcess, (req, res) => {
 
     // Fetch updated process
     const updated = db.prepare(`
-      SELECT p.*, u.full_name AS technician_name, m.full_name AS manager_name, c.full_name AS created_by_name
+      SELECT p.*, u.full_name AS technician_name, u.email AS technician_email, u.phone AS technician_phone, m.full_name AS manager_name, c.full_name AS created_by_name
       FROM processes p
       LEFT JOIN users u ON p.technician_id = u.id
       LEFT JOIN users m ON p.manager_id = m.id
       LEFT JOIN users c ON p.created_by = c.id
       WHERE p.id = ?
     `).get(process.id);
+
+    // Sync Google Drive folder location (move to Concluidos when FECHADO, or rename if client changed)
+    if (updates.status !== undefined || updates.client !== undefined || !updated.google_drive_folder_id) {
+      const syncedFolder = await syncProcessDriveFolderState(updated);
+      if (syncedFolder?.folderId) {
+        db.prepare(`
+          UPDATE processes
+          SET google_drive_folder_id = ?, google_drive_folder_url = ?
+          WHERE id = ?
+        `).run(syncedFolder.folderId, syncedFolder.folderUrl, updated.id);
+        updated.google_drive_folder_id = syncedFolder.folderId;
+        updated.google_drive_folder_url = syncedFolder.folderUrl;
+      }
+    }
+
+    // Sync intervention calendar event
+    await syncProcessInterventionEvent(updated, req.user.id);
 
     res.json(updated);
   } catch (err) {

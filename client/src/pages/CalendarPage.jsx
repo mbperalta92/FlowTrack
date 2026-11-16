@@ -140,8 +140,9 @@ export default function CalendarPage() {
       map[dateKey].push(item);
     }
 
-    // 1. Manual events
+    // 1. Manual events (skip auto-synced process events since processes list renders them richly below)
     events.forEach(e => {
+      if (e.process_id) return;
       const participantIds = e.participants ? e.participants.map(p => p.id) : [];
       const involvedUserIds = [e.created_by, ...participantIds];
       
@@ -179,37 +180,39 @@ export default function CalendarPage() {
       }
     });
 
-    // 3. Process Agendamentos (schedule_date)
+    // 3. Process Agendamentos & Interventions (with Process Name, Technician & Address/Locality)
     processes.forEach(p => {
       if (filterUser1 && p.manager_id !== filterUser1) return;
       if (filterUser2 && p.technician_id !== filterUser2) return;
+      if (p.status !== 'ABERTO') return;
 
-      if (p.schedule_date && p.status === 'ABERTO') {
-        const dateKey = p.schedule_date.split('T')[0];
-        add(dateKey, {
+      const techLabel = p.technician_name || 'Sem Técnico';
+      const techPhoneLabel = p.technician_phone ? ` (${p.technician_phone})` : '';
+      const locLabel = p.address ? ` • 📍 ${p.address}` : '';
+      const schedDateKey = p.schedule_date ? p.schedule_date.split('T')[0] : null;
+      const intervDateKey = p.next_intervention_date ? p.next_intervention_date.split('T')[0] : null;
+
+      if (schedDateKey && schedDateKey !== intervDateKey) {
+        add(schedDateKey, {
           id: `proc-sched-${p.id}`,
           type: 'schedule',
-          title: `Agenda: ${p.process_id} (${p.client})`,
+          title: `${p.process_id} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
           colorClass: 'evt-blue',
           time: p.schedule_date.includes('T') ? p.schedule_date.split('T')[1].substring(0, 5) : null,
           process: p
         });
       }
-    });
 
-    // 4. Process Next Interventions (next_intervention_date)
-    processes.forEach(p => {
-      if (filterUser1 && p.manager_id !== filterUser1) return;
-      if (filterUser2 && p.technician_id !== filterUser2) return;
+      if (intervDateKey) {
+        const timeVal = (p.next_intervention_date.includes('T') ? p.next_intervention_date.split('T')[1].substring(0, 5) : null)
+          || (schedDateKey === intervDateKey && p.schedule_date?.includes('T') ? p.schedule_date.split('T')[1].substring(0, 5) : null);
 
-      if (p.next_intervention_date && p.status === 'ABERTO') {
-        const dateKey = p.next_intervention_date.split('T')[0];
-        add(dateKey, {
+        add(intervDateKey, {
           id: `proc-interv-${p.id}`,
           type: 'intervention',
-          title: `Interv: ${p.process_id} (${p.client})`,
+          title: `${p.process_id} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
           colorClass: 'evt-orange',
-          time: p.next_intervention_date.includes('T') ? p.next_intervention_date.split('T')[1].substring(0, 5) : null,
+          time: timeVal,
           process: p
         });
       }
@@ -722,6 +725,10 @@ export default function CalendarPage() {
                                         <div className="agenda-process-info-box">
                                           <div className="agenda-process-info">
                                             <span><strong>Cliente:</strong> {evt.process.client}</span>
+                                            <span>👤 <strong>Técnico:</strong> {evt.process.technician_name || 'Sem Técnico'}</span>
+                                            {(evt.process.technician_phone || evt.process.technician_email) && (
+                                              <span>📞 <strong>Contacto:</strong> {[evt.process.technician_phone, evt.process.technician_email].filter(Boolean).join(' | ')}</span>
+                                            )}
                                             <span className="badge-milestone">{evt.process.milestone}</span>
                                             <button
                                               className="btn btn-outline btn-xs"
@@ -856,6 +863,22 @@ export default function CalendarPage() {
                           
                           {evt.description && <p className="evt-desc">{evt.description}</p>}
                           {evt.time && <div className="evt-meta">🕒 {evt.time}</div>}
+                          {evt.process && (
+                            <>
+                              <div className="evt-meta">👤 <strong>Técnico:</strong> {evt.process.technician_name || 'Sem Técnico'}</div>
+                              {(evt.process.technician_phone || evt.process.technician_email) && (
+                                <div className="evt-meta">📞 <strong>Contacto:</strong> {[evt.process.technician_phone, evt.process.technician_email].filter(Boolean).join(' | ')}</div>
+                              )}
+                              <div className="evt-meta">📍 <strong>Localidade/Morada:</strong> {evt.process.address || 'Não definida'}</div>
+                              <button
+                                className="btn btn-outline btn-xs"
+                                style={{ marginTop: '6px' }}
+                                onClick={() => setSelectedProcessId(evt.process.id)}
+                              >
+                                Abrir Processo ↗
+                              </button>
+                            </>
+                          )}
                           {evt.creator && <div className="evt-meta">👤 Criador: {evt.creator}</div>}
                           
                           {evt.participants && evt.participants.length > 0 && (

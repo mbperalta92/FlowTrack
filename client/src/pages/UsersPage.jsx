@@ -23,6 +23,7 @@ export default function UsersPage() {
     password: '',
     full_name: '',
     email: '',
+    phone: '',
     birth_date: '',
     address: '',
     nif: '',
@@ -63,6 +64,7 @@ export default function UsersPage() {
       password: '',
       full_name: '',
       email: '',
+      phone: '',
       birth_date: '',
       address: '',
       nif: '',
@@ -79,6 +81,7 @@ export default function UsersPage() {
       password: '', // blank password unless changing it
       full_name: u.full_name,
       email: u.email,
+      phone: u.phone || '',
       birth_date: u.birth_date ? u.birth_date.split('T')[0] : '',
       address: u.address || '',
       nif: u.nif || '',
@@ -169,6 +172,7 @@ export default function UsersPage() {
                   <th>Nome Completo</th>
                   <th>Username</th>
                   <th>Email</th>
+                  <th>Contacto</th>
                   <th>Cargo / Permissão</th>
                   <th>NIF</th>
                   <th>Ações</th>
@@ -183,6 +187,7 @@ export default function UsersPage() {
                     </td>
                     <td>{u.username}</td>
                     <td>{u.email}</td>
+                    <td>{u.phone || <span className="muted-text">---</span>}</td>
                     <td>
                       <span className={`role-badge role-${u.role}`}>
                         {rolesMap[u.role] || u.role}
@@ -273,6 +278,19 @@ export default function UsersPage() {
                   />
                 </div>
 
+                <div className="form-group">
+                  <label>Contacto / Telemóvel</label>
+                  <input 
+                    type="text"
+                    className="input-field"
+                    placeholder="Ex: 912 345 678"
+                    value={formData.phone}
+                    onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
                   <label>NIF (Nº Contribuinte)</label>
                   <input 
