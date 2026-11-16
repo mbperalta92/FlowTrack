@@ -7,6 +7,7 @@ client/node_modules/
 server/node_modules/
 server/uploads/
 database/repfix.db
+server/database/*.db
 server/database/*.db-wal
 server/database/*.db-shm
 server/database/.sync-meta.json

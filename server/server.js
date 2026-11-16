@@ -39,6 +39,19 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Security & Privacy Headers (Block search engine indexing and iframe embedding)
+app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
+
 // Automatically fetch missing attachments from Google Drive if requested after a cloud restart
 app.get('/uploads/attachments/:filename', async (req, res, next) => {
   const filename = path.basename(req.params.filename);
@@ -87,10 +100,13 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// ─── Google Drive OAuth2 Quick Setup ──────────────────────────
+// ─── Google Drive OAuth2 Quick Setup (Local Only) ─────────────
 const REDIRECT_URI = 'http://localhost:3001/api/google-drive/callback';
 
 app.get('/api/google-drive/setup', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Acesso restrito em produção.' });
+  }
   const cfg = getOAuthConfig() || {};
   const isConnected = !!(cfg.clientId && cfg.clientSecret && cfg.refreshToken);
   res.send(`<!DOCTYPE html>
@@ -121,9 +137,9 @@ app.get('/api/google-drive/setup', (req, res) => {
     </p>
     <form method="POST" action="/api/google-drive/auth">
       <label>ID do cliente (Client ID)</label>
-      <input type="text" name="clientId" required placeholder="Ex: 102534...apps.googleusercontent.com" value="${cfg.clientId || ''}" />
+      <input type="text" name="clientId" required placeholder="Ex: 102534...apps.googleusercontent.com" value="" />
       <label>Chave secreta do cliente (Client Secret)</label>
-      <input type="password" name="clientSecret" required placeholder="Ex: GOCSPX-..." value="${cfg.clientSecret || ''}" />
+      <input type="password" name="clientSecret" required placeholder="Ex: GOCSPX-..." value="" />
       <button type="submit">🔗 Autorizar com a Conta Google (geral@repfix.pt)</button>
     </form>
   </div>
@@ -132,6 +148,9 @@ app.get('/api/google-drive/setup', (req, res) => {
 });
 
 app.post('/api/google-drive/auth', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Acesso restrito em produção.' });
+  }
   const clientId = (req.body.clientId || '').trim();
   const clientSecret = (req.body.clientSecret || '').trim();
   saveOAuthConfig({ clientId, clientSecret, redirectUri: REDIRECT_URI });
@@ -149,6 +168,9 @@ app.post('/api/google-drive/auth', (req, res) => {
 });
 
 app.get('/api/google-drive/callback', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Acesso restrito em produção.' });
+  }
   try {
     const code = req.query.code;
     const cfg = getOAuthConfig();

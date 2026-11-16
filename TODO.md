@@ -41,10 +41,13 @@
 
 ## ⏳ Passos Finais para Amanhã (Publicação Online 24/7 — 0€ e Sem Cartão)
 
-1. **Passo 1 — GitHub Desktop:**
-   - [ ] Fazer **Commit to main** e **Push origin** para enviar o código atualizado para o GitHub.
-2. **Passo 2 — Render.com (Plano *Free Web Service* — Sem Cartão):**
-   - [ ] Entrar em [https://render.com](https://render.com) com a conta do GitHub, escolher **New -> Web Service**, selecionar o repositório `FlowTrack` e o plano **Free (0€)**.
-   - [ ] Colar as variáveis de ambiente (`SMTP_*` e `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`).
+1. **Passo 1 — GitHub Desktop (`https://github.com/mbperalta92/FlowTrack.git`):**
+   - [x] **Concluído!** Os 30 ficheiros atualizados já foram enviados (*Commit & Push*) para o GitHub.
+2. **Passo 2 — Render.com (Plano *Free Web Service* — Sem Cartão) [RETOMAR AQUI AMANHÃ]:**
+   - [ ] Entrar em [https://dashboard.render.com/register](https://dashboard.render.com/register) com a conta GitHub (`mbperalta92`).
+   - [ ] Clicar em **+ New -> Web Service**, escolher o repositório `FlowTrack` e o plano **Free ($0/month)**:
+     - **Build Command:** `npm --prefix client install && npm --prefix client run build && npm --prefix server install`
+     - **Start Command:** `node server/server.js`
+   - [ ] Clicar em **Add from .env** e colar as variáveis (`SMTP_*` e `GOOGLE_*`).
 3. **Passo 3 — UptimeRobot.com (Plano *Free* — Sem Cartão):**
    - [ ] Criar um monitor HTTP(s) gratuito de 5 em 5 minutos para `https://<teu-link>.onrender.com/api/health` para manter a aplicação acordada **24/7**.
