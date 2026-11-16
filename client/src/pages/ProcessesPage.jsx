@@ -62,6 +62,7 @@ export default function ProcessesPage() {
     technician_id: '',
     manager_id: ''
   });
+  const [createFiles, setCreateFiles] = useState([]);
   const [formSaving, setFormSaving] = useState(false);
   
   // Users state
@@ -221,14 +222,30 @@ export default function ProcessesPage() {
       if (!payload.parent_id) delete payload.parent_id;
       else payload.parent_id = parseInt(payload.parent_id, 10);
 
-      await api.post('/processes', payload);
+      const createdProc = await api.post('/processes', payload);
+
+      // Se o utilizador selecionou ficheiros na criação do processo, anexá-los automaticamente
+      if (createFiles.length > 0 && createdProc?.id) {
+        try {
+          const formData = new FormData();
+          formData.append('comment', '📎 Documento(s) anexado(s) na abertura do processo.');
+          createFiles.forEach(f => formData.append('files', f));
+          await api.post(`/processes/${createdProc.id}/history`, formData);
+        } catch (attErr) {
+          console.error('Erro ao anexar ficheiros iniciais:', attErr);
+          toast.error('Processo criado, mas ocorreu um erro ao enviar os anexos iniciais.');
+        }
+      }
+
       toast.success('Processo criado com sucesso!');
       setShowCreateModal(false);
+      setCreateFiles([]);
       
       setCreateForm({
         parent_id: '',
         client: '',
         client_code: '',
+        address: '',
         description: '',
         priority: 'Media',
         milestone: 'FILA',
@@ -631,8 +648,8 @@ export default function ProcessesPage() {
                       <td><span className={`status-badge status-${p.status.toLowerCase()}`}>{p.status}</span></td>
                       <td><span className="milestone-badge">{p.milestone}</span></td>
                       <td>
-                        {p.client}
-                        {p.client_code && <span className="muted-text" style={{ marginLeft: '6px', fontSize: '0.85em' }}>({p.client_code})</span>}
+                        <div><strong>{p.client}</strong></div>
+                        {p.client_code && <div className="muted-text" style={{ fontSize: '0.82em', color: '#facc15' }}>🔗 Ref.ª Cliente: {p.client_code}</div>}
                       </td>
                       <td>{formatShortName(p.manager_name) || <span className="unassigned">N/A</span>}</td>
                       <td>{formatShortName(p.technician_name) || <span className="unassigned">Sem Técnico</span>}</td>
@@ -687,7 +704,7 @@ export default function ProcessesPage() {
                                     </div>
                                     <div className="card-client">
                                       <strong>{p.client}</strong>
-                                      {p.client_code && <span className="muted-text" style={{ fontSize: '0.85em', display: 'block', marginTop: '2px' }}>Cód: {p.client_code}</span>}
+                                      {p.client_code && <span className="muted-text" style={{ fontSize: '0.85em', display: 'block', marginTop: '2px', color: '#facc15' }}>🔗 Ref.ª Cliente: {p.client_code}</span>}
                                     </div>
                                     {p.description && (
                                       <p className="card-desc-preview">
@@ -781,25 +798,26 @@ export default function ProcessesPage() {
                 </div>
               )}
 
-              <div className="form-group">
-                <label>Cliente</label>
-                <div style={{ display: 'flex', gap: '12px' }}>
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1.4 }}>
+                  <label>Cliente</label>
                   <input 
                     type="text" 
                     className="input-field"
                     required 
-                    placeholder="Nome do Cliente"
+                    placeholder="Nome do Cliente / Seguradora"
                     value={createForm.client}
                     onChange={e => setCreateForm(prev => ({ ...prev, client: e.target.value }))}
-                    style={{ flex: 2 }}
                   />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>N.º Processo Cliente / Ref.ª</label>
                   <input 
                     type="text" 
                     className="input-field"
-                    placeholder="Cód. Cliente (Opcional)"
+                    placeholder="Ex: SIN-2026-04912 (Opcional)"
                     value={createForm.client_code}
                     onChange={e => setCreateForm(prev => ({ ...prev, client_code: e.target.value }))}
-                    style={{ flex: 1 }}
                   />
                 </div>
               </div>
@@ -870,6 +888,62 @@ export default function ProcessesPage() {
                     {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Anexos / Documentos Iniciais (Opcional)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <label className="btn btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    📎 Anexar Ficheiro(s)
+                    <input
+                      type="file"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const selected = Array.from(e.target.files || []);
+                        if (selected.length > 0) {
+                          setCreateFiles(prev => [...prev, ...selected]);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {createFiles.length === 0 && (
+                    <span className="muted-text" style={{ fontSize: '0.82rem' }}>
+                      Os ficheiros serão enviados automaticamente para a pasta Google Drive do processo.
+                    </span>
+                  )}
+                </div>
+                {createFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                    {createFiles.map((file, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'rgba(234, 179, 8, 0.14)',
+                          border: '1px solid rgba(234, 179, 8, 0.35)',
+                          color: '#fef08a',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.82rem'
+                        }}
+                      >
+                        📄 {file.name}
+                        <button
+                          type="button"
+                          onClick={() => setCreateFiles(prev => prev.filter((_, i) => i !== idx))}
+                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 700, padding: '0 2px' }}
+                          title="Remover ficheiro"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="form-actions">

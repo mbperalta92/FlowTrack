@@ -76,6 +76,21 @@ function generateProcessId(type) {
 }
 
 /**
+ * Format standard email subject keeping the descriptive title + our Process ID, Client Name, and Client Ref:
+ * Ex: "REPFIX - Novo Processo Atribuído (PROC-001; Fidelidade; Ref.ª: SIN-2026-04912)"
+ */
+function formatEmailSubject(actionLabel, processDisplayId, clientName, clientCode) {
+  const details = [processDisplayId];
+  if (clientName && String(clientName).trim()) {
+    details.push(String(clientName).trim());
+  }
+  if (clientCode && String(clientCode).trim()) {
+    details.push(`Ref.ª: ${String(clientCode).trim()}`);
+  }
+  return `REPFIX - ${actionLabel} (${details.join('; ')})`;
+}
+
+/**
  * Create notifications for milestone changes (only for the assigned manager).
  */
 function createMilestoneNotifications(processId, processDisplayId, newMilestone, assignedManagerId) {
@@ -83,6 +98,8 @@ function createMilestoneNotifications(processId, processDisplayId, newMilestone,
     const manager = db.prepare(`
       SELECT id, email, full_name FROM users WHERE id = ?
     `).get(assignedManagerId);
+    const procInfo = db.prepare('SELECT client, client_code, address FROM processes WHERE id = ?').get(processId);
+    const refPart = procInfo?.client_code ? ` [Ref.ª Cliente: ${procInfo.client_code}]` : '';
 
     if (manager) {
       db.prepare(`
@@ -92,15 +109,15 @@ function createMilestoneNotifications(processId, processDisplayId, newMilestone,
         manager.id,
         'milestone_supervisao',
         'Processo em Supervisão',
-        `O processo ${processDisplayId} avançou para a fase de SUPERVISÃO.`,
+        `O processo ${processDisplayId}${refPart} avançou para a fase de SUPERVISÃO.`,
         processId
       );
 
       if (manager.email) {
         sendEmail(
           manager.email,
-          `REPFIX - Processo em Supervisão (${processDisplayId})`,
-          `Olá ${manager.full_name},\n\nO processo ${processDisplayId} avançou para a fase de SUPERVISÃO.\nPor favor, verifique a plataforma FlowTrack para mais detalhes.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
+          formatEmailSubject('Processo em Supervisão', processDisplayId, procInfo?.client, procInfo?.client_code),
+          `Olá ${manager.full_name},\n\nO processo ${processDisplayId} avançou para a fase de SUPERVISÃO.\n\n• Processo REPFIX: ${processDisplayId}\n• Nome Cliente: ${procInfo?.client || 'N/A'}\n• N.º Processo Cliente / Ref.ª: ${procInfo?.client_code || 'Não definido'}\n• Localidade / Morada: ${procInfo?.address || 'Não definida'}\n\nPor favor, verifique a plataforma FlowTrack para mais detalhes.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
         );
       }
     }
@@ -109,7 +126,7 @@ function createMilestoneNotifications(processId, processDisplayId, newMilestone,
 
 /**
  * Automatically create or update a Calendar Event whenever an intervention/schedule is marked on a process.
- * Includes Process ID/Name, Technician Name, and Address/Locality.
+ * Includes Process ID/Name, Client Process Code, Technician Name, and Address/Locality.
  * Also syncs directly to Google Calendar!
  */
 export async function syncProcessInterventionEvent(proc, actorUserId) {
@@ -129,8 +146,9 @@ export async function syncProcessInterventionEvent(proc, actorUserId) {
     const techName = proc.technician_name || 'Sem Técnico';
     const techContact = [proc.technician_phone, proc.technician_email].filter(Boolean).join(' | ') || 'Sem contacto';
     const locationText = proc.address || proc.client || 'Sem Localidade';
-    const eventTitle = `Interv: ${proc.process_id} | 👤 ${techName} | 📍 ${locationText}`;
-    const eventDesc = `Processo: ${proc.process_id} (${proc.client})\nTécnico: ${techName} (${techContact})\nLocalidade/Morada: ${proc.address || 'Não definida'}`;
+    const refTag = proc.client_code ? ` [Ref: ${proc.client_code}]` : '';
+    const eventTitle = `Interv: ${proc.process_id}${refTag} | 👤 ${techName} | 📍 ${locationText}`;
+    const eventDesc = `Processo REPFIX: ${proc.process_id}\nN.º Processo Cliente / Ref.ª: ${proc.client_code || 'Não definido'}\nCliente: ${proc.client}\nTécnico: ${techName} (${techContact})\nLocalidade/Morada: ${proc.address || 'Não definida'}`;
 
     const existingEvent = db.prepare('SELECT id FROM events WHERE process_id = ?').get(proc.id);
     let eventId;
@@ -173,6 +191,9 @@ export async function syncProcessInterventionEvent(proc, actorUserId) {
 }
 
 function createAssignmentNotification(processId, processDisplayId, technicianId) {
+  const procInfo = db.prepare('SELECT client, client_code, address FROM processes WHERE id = ?').get(processId);
+  const refPart = procInfo?.client_code ? ` [Ref.ª Cliente: ${procInfo.client_code}]` : '';
+
   const notifStmt = db.prepare(`
     INSERT INTO notifications (user_id, type, title, message, process_id)
     VALUES (?, ?, ?, ?, ?)
@@ -182,7 +203,7 @@ function createAssignmentNotification(processId, processDisplayId, technicianId)
     technicianId,
     'assignment',
     'Processo Atribuído',
-    `O processo ${processDisplayId} foi-lhe atribuído.`,
+    `O processo ${processDisplayId}${refPart} foi-lhe atribuído.`,
     processId
   );
   
@@ -191,8 +212,8 @@ function createAssignmentNotification(processId, processDisplayId, technicianId)
   if (tech && tech.email) {
     sendEmail(
       tech.email,
-      `REPFIX - Novo Processo Atribuído (${processDisplayId})`,
-      `Olá ${tech.full_name},\n\nFoi-lhe atribuído o processo ${processDisplayId}.\nPor favor, verifique a plataforma FlowTrack para mais detalhes e acompanhamento.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
+      formatEmailSubject('Novo Processo Atribuído', processDisplayId, procInfo?.client, procInfo?.client_code),
+      `Olá ${tech.full_name},\n\nFoi-lhe atribuído o processo ${processDisplayId}.\n\n• Processo REPFIX: ${processDisplayId}\n• Nome Cliente: ${procInfo?.client || 'N/A'}\n• N.º Processo Cliente / Ref.ª: ${procInfo?.client_code || 'Não definido'}\n• Localidade / Morada: ${procInfo?.address || 'Não definida'}\n\nPor favor, verifique a plataforma FlowTrack para mais detalhes e acompanhamento.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
     );
   }
 }
@@ -758,9 +779,13 @@ router.put('/:id', authenticateToken, canEditProcess, async (req, res) => {
       const assignedManager = db.prepare(`
         SELECT id, email, full_name FROM users WHERE id = ?
       `).get(effectiveManagerId);
+      const effectiveClientCode = updates.client_code !== undefined ? updates.client_code : process.client_code;
+      const effectiveClient = updates.client !== undefined ? updates.client : process.client;
+      const effectiveAddress = updates.address !== undefined ? updates.address : process.address;
+      const refPart = effectiveClientCode ? ` [Ref.ª Cliente: ${effectiveClientCode}]` : '';
 
       if (assignedManager) {
-        const messageText = `O Técnico ${req.user.full_name} concluiu a fase de campo do Processo ${process.process_id} e passou-o para Elaboração.`;
+        const messageText = `O Técnico ${req.user.full_name} concluiu a fase de campo do Processo ${process.process_id}${refPart} e passou-o para Elaboração.`;
 
         db.prepare(`
           INSERT INTO notifications (user_id, type, title, message, process_id)
@@ -776,8 +801,8 @@ router.put('/:id', authenticateToken, canEditProcess, async (req, res) => {
         if (assignedManager.email) {
           sendEmail(
             assignedManager.email,
-            `REPFIX - Fase de Campo Concluída (${process.process_id})`,
-            `Olá ${assignedManager.full_name},\n\n${messageText}\nPor favor, verifique a plataforma FlowTrack.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
+            formatEmailSubject('Fase de Campo Concluída', process.process_id, effectiveClient, effectiveClientCode),
+            `Olá ${assignedManager.full_name},\n\n${messageText}\n\n• Processo REPFIX: ${process.process_id}\n• Nome Cliente: ${effectiveClient}\n• N.º Processo Cliente / Ref.ª: ${effectiveClientCode || 'Não definido'}\n• Localidade / Morada: ${effectiveAddress || 'Não definida'}\n\nPor favor, verifique a plataforma FlowTrack.\n\nCom os melhores cumprimentos,\nEquipa REPFIX`
           );
         }
       }

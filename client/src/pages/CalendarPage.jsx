@@ -189,6 +189,7 @@ export default function CalendarPage() {
       const techLabel = p.technician_name || 'Sem Técnico';
       const techPhoneLabel = p.technician_phone ? ` (${p.technician_phone})` : '';
       const locLabel = p.address ? ` • 📍 ${p.address}` : '';
+      const refLabel = p.client_code ? ` [Ref: ${p.client_code}]` : '';
       const schedDateKey = p.schedule_date ? p.schedule_date.split('T')[0] : null;
       const intervDateKey = p.next_intervention_date ? p.next_intervention_date.split('T')[0] : null;
 
@@ -196,7 +197,7 @@ export default function CalendarPage() {
         add(schedDateKey, {
           id: `proc-sched-${p.id}`,
           type: 'schedule',
-          title: `${p.process_id} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
+          title: `${p.process_id}${refLabel} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
           colorClass: 'evt-blue',
           time: p.schedule_date.includes('T') ? p.schedule_date.split('T')[1].substring(0, 5) : null,
           process: p
@@ -210,7 +211,7 @@ export default function CalendarPage() {
         add(intervDateKey, {
           id: `proc-interv-${p.id}`,
           type: 'intervention',
-          title: `${p.process_id} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
+          title: `${p.process_id}${refLabel} (${p.client}) • 👤 ${techLabel}${techPhoneLabel}${locLabel}`,
           colorClass: 'evt-orange',
           time: timeVal,
           process: p
@@ -725,6 +726,9 @@ export default function CalendarPage() {
                                         <div className="agenda-process-info-box">
                                           <div className="agenda-process-info">
                                             <span><strong>Cliente:</strong> {evt.process.client}</span>
+                                            {evt.process.client_code && (
+                                              <span>🔗 <strong>Ref.ª Cliente:</strong> {evt.process.client_code}</span>
+                                            )}
                                             <span>👤 <strong>Técnico:</strong> {evt.process.technician_name || 'Sem Técnico'}</span>
                                             {(evt.process.technician_phone || evt.process.technician_email) && (
                                               <span>📞 <strong>Contacto:</strong> {[evt.process.technician_phone, evt.process.technician_email].filter(Boolean).join(' | ')}</span>
@@ -865,6 +869,9 @@ export default function CalendarPage() {
                           {evt.time && <div className="evt-meta">🕒 {evt.time}</div>}
                           {evt.process && (
                             <>
+                              {evt.process.client_code && (
+                                <div className="evt-meta">🔗 <strong>Ref.ª Cliente:</strong> {evt.process.client_code}</div>
+                              )}
                               <div className="evt-meta">👤 <strong>Técnico:</strong> {evt.process.technician_name || 'Sem Técnico'}</div>
                               {(evt.process.technician_phone || evt.process.technician_email) && (
                                 <div className="evt-meta">📞 <strong>Contacto:</strong> {[evt.process.technician_phone, evt.process.technician_email].filter(Boolean).join(' | ')}</div>

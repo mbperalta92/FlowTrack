@@ -16,6 +16,7 @@ import historyRoutes from './routes/history.js';
 import notificationRoutes from './routes/notifications.js';
 import eventRoutes from './routes/events.js';
 import analyticsRoutes from './routes/analytics.js';
+import ticketRoutes from './routes/tickets.js';
 import { google } from 'googleapis';
 import {
   saveOAuthConfig,
@@ -99,6 +100,7 @@ app.use('/api/processes', historyRoutes);       // /api/processes/:id/history
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // ─── Google Drive OAuth2 Quick Setup (Local Only) ─────────────
 const REDIRECT_URI = 'http://localhost:3001/api/google-drive/callback';

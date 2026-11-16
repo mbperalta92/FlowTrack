@@ -282,6 +282,24 @@
   color: var(--text-muted);
 }
 
+.user-ticket-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  color: var(--gold-primary, #facc15);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.user-ticket-btn:hover {
+  background: rgba(234, 179, 8, 0.12);
+}
+
 .user-logout {
   display: flex;
   align-items: center;
@@ -295,6 +313,97 @@
 
 .user-logout:hover {
   background: rgba(239, 68, 68, 0.1);
+}
+
+/* Ticket Modal */
+.ticket-modal {
+  max-width: 600px;
+  width: 95%;
+}
+
+.ticket-form {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ticket-type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.ticket-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ticket-type-btn:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.ticket-type-btn.active-bug {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--text-primary);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
+}
+
+.ticket-type-btn.active-improvement {
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.14);
+  color: var(--text-primary);
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.18);
+}
+
+.ticket-type-icon {
+  font-size: 1.5rem;
+}
+
+.ticket-type-btn strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.ticket-type-btn small {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.ticket-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(234, 179, 8, 0.14);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fef08a;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.ticket-file-pill button {
+  background: none;
+  border: none;
+  color: #f87171;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 2px;
 }
 
 @media (max-width: 768px) {

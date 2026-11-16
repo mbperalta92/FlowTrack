@@ -240,6 +240,22 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
           <div className="header-left">
             <span className={`type-tag type-${proc.type.toLowerCase()}`}>{proc.type}</span>
             <h2>{proc.process_id}</h2>
+            {proc.client_code && (
+              <span
+                style={{
+                  background: 'rgba(250, 204, 21, 0.14)',
+                  border: '1px solid rgba(250, 204, 21, 0.4)',
+                  color: '#facc15',
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600
+                }}
+                title="Número de Processo do Cliente / Referência Externa"
+              >
+                🔗 Ref.ª Cliente: {proc.client_code}
+              </span>
+            )}
             <span className={`status-badge status-${proc.status.toLowerCase()}`}>
               {proc.status}
             </span>
@@ -268,9 +284,9 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
           <div className="detail-panel">
             {error && <div className="error-banner">{error}</div>}
 
-            <div className="form-group">
-              <label>Cliente</label>
-              <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="form-row">
+              <div className="form-group" style={{ flex: 1.4 }}>
+                <label>Cliente</label>
                 <input
                   type="text"
                   className="input-field"
@@ -278,17 +294,18 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
                   disabled={!canEditFullProcess}
                   onChange={e => setProc(prev => ({ ...prev, client: e.target.value }))}
                   onBlur={e => handleFieldChange('client', e.target.value)}
-                  style={{ flex: 2 }}
                 />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>N.º Processo Cliente / Ref.ª</label>
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="Código Cliente"
+                  placeholder="Ex: SIN-2026-04912"
                   value={proc.client_code || ''}
                   disabled={!canEditFullProcess}
                   onChange={e => setProc(prev => ({ ...prev, client_code: e.target.value }))}
                   onBlur={e => handleFieldChange('client_code', e.target.value)}
-                  style={{ flex: 1 }}
                 />
               </div>
             </div>

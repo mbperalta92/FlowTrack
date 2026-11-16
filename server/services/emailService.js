@@ -51,8 +51,9 @@ initTransporter().catch(console.error);
  * @param {string} subject - Email subject
  * @param {string} text - Plain text email body
  * @param {string} html - HTML email body (optional)
+ * @param {object} extraOptions - Optional extra nodemailer fields (cc, replyTo, attachments)
  */
-export async function sendEmail(to, subject, text, html) {
+export async function sendEmail(to, subject, text, html, extraOptions = {}) {
   try {
     if (!transporter) await initTransporter();
 
@@ -62,6 +63,7 @@ export async function sendEmail(to, subject, text, html) {
       subject,
       text,
       html: html || text.replace(/\n/g, '<br>'),
+      ...extraOptions,
     });
 
     console.log("Message sent: %s", info.messageId);

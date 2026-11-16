@@ -386,9 +386,11 @@ export async function syncProcessToGoogleCalendar(proc) {
   const techContactParts = [proc.technician_phone, proc.technician_email].filter(Boolean);
   const techContact = techContactParts.length > 0 ? techContactParts.join(' | ') : 'Sem contacto';
   const locText = proc.address || proc.client || '';
-  const summary = `${proc.process_id} (${proc.client}) • ${techName}${proc.technician_phone ? ' (' + proc.technician_phone + ')' : ''}${proc.address ? ' • ' + proc.address : ''}`;
+  const refTag = proc.client_code ? ` [Ref: ${proc.client_code}]` : '';
+  const summary = `${proc.process_id}${refTag} (${proc.client}) • ${techName}${proc.technician_phone ? ' (' + proc.technician_phone + ')' : ''}${proc.address ? ' • ' + proc.address : ''}`;
   const description = [
-    `Processo: ${proc.process_id}`,
+    `Processo REPFIX: ${proc.process_id}`,
+    `N.º Processo Cliente / Ref.ª: ${proc.client_code || 'Não definido'}`,
     `Cliente: ${proc.client}`,
     `Técnico: ${techName}`,
     `Contacto do Técnico: ${techContact}`,

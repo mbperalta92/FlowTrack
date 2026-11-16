@@ -37,17 +37,30 @@
   - [x] Download automático de anexos em falta a partir da Google Drive (`downloadDriveFileToLocal` em `/uploads/attachments/:filename`)
   - [x] Suporte a variáveis de ambiente OAuth (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`) para o Render
 
+- [x] **Publicação Online 24/7 na Cloud (`Render.com` — Custo 0€ e Sem Cartão)**
+  - [x] Código publicado no GitHub (`https://github.com/mbperalta92/FlowTrack.git`)
+  - [x] Aplicação online em produção no endereço oficial: **[https://flowtrack-tgpx.onrender.com](https://flowtrack-tgpx.onrender.com)**
+  - [x] Blindagem de segurança e privacidade ativa (bloqueio de motores de busca `noindex/nofollow`, `robots.txt`, autenticação JWT obrigatória, e dados guardados na conta privada `geral@repfix.pt`)
+
 ---
 
-## ⏳ Passos Finais para Amanhã (Publicação Online 24/7 — 0€ e Sem Cartão)
+## 💡 Lista de Oportunidades de Melhoria (Pós-Feedback dos Utilizadores)
 
-1. **Passo 1 — GitHub Desktop (`https://github.com/mbperalta92/FlowTrack.git`):**
-   - [x] **Concluído!** Os 30 ficheiros atualizados já foram enviados (*Commit & Push*) para o GitHub.
-2. **Passo 2 — Render.com (Plano *Free Web Service* — Sem Cartão) [RETOMAR AQUI AMANHÃ]:**
-   - [ ] Entrar em [https://dashboard.render.com/register](https://dashboard.render.com/register) com a conta GitHub (`mbperalta92`).
-   - [ ] Clicar em **+ New -> Web Service**, escolher o repositório `FlowTrack` e o plano **Free ($0/month)**:
-     - **Build Command:** `npm --prefix client install && npm --prefix client run build && npm --prefix server install`
-     - **Start Command:** `node server/server.js`
-   - [ ] Clicar em **Add from .env** e colar as variáveis (`SMTP_*` e `GOOGLE_*`).
-3. **Passo 3 — UptimeRobot.com (Plano *Free* — Sem Cartão):**
-   - [ ] Criar um monitor HTTP(s) gratuito de 5 em 5 minutos para `https://<teu-link>.onrender.com/api/health` para manter a aplicação acordada **24/7**.
+### ⚡ Categoria: Velocidade e Disponibilidade do FlowTrack
+#### 1. Eliminação do Tempo de Arranque (*Cold Start*) via UptimeRobot (Gratuito)
+- **O que é:**
+  Um serviço externo gratuito de monitorização ([UptimeRobot.com](https://uptimerobot.com)) que visita automaticamente a aplicação de 5 em 5 minutos.
+- **O que faz:**
+  No plano gratuito do Render (`$0/mês`), se ninguém aceder ao FlowTrack durante 15 minutos seguidos (ex.: durante a noite ou horas sem atividade), o servidor entra em modo de poupança (*sleep*). Quando o primeiro utilizador abre o site após essa pausa, demora cerca de **30 a 50 segundos** a acordar (nas navegações seguintes é imediato). O UptimeRobot faz um toque automático a `/api/health` a cada 5 minutos para impedir que o servidor adormeça, garantindo que a página abre sempre em **1 segundo**.
+- **Como podemos fazer (em 2 minutos, quando quiseres ativar):**
+  1. Criar conta gratuita em [https://uptimerobot.com](https://uptimerobot.com) (com `geral@repfix.pt`, sem cartão).
+  2. Clicar em **`+ Add New Monitor`**.
+  3. Escolher **Monitor Type:** `HTTP(s)`, **Friendly Name:** `REPFIX FlowTrack`, **URL:** `https://flowtrack-tgpx.onrender.com/api/health` e **Interval:** `5 minutes`.
+  4. Clicar em **`Create Monitor`**.
+- **Prós (Vantagens):**
+  - ✅ **100% Gratuito** e não exige cartão multibanco.
+  - ✅ **Abertura instantânea (1 segundo)** a qualquer hora do dia ou da noite para todos os utilizadores.
+  - ✅ Envia um alerta por e-mail para `geral@repfix.pt` caso algum dia o servidor do Render esteja em manutenção.
+- **Contras (Desvantagens):**
+  - ⚠️ Como mantém o servidor ligado 24h/dia sem pausas, consome cerca de ~720h das **750 horas mensais gratuitas** do Render (se criares um 2.º site gratuito na mesma conta do Render no futuro, teriam de partilhar essas 750 horas).
+  - ⚠️ Depende de criar e manter uma conta num serviço externo adicional (UptimeRobot).
