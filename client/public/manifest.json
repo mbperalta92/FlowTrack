@@ -1,0 +1,17 @@
+{
+  "name": "REPFIX FlowTrack",
+  "short_name": "FlowTrack",
+  "description": "Sistema de Gestão de Peritagens e Processos REPFIX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "icons": [
+    {
+      "src": "/repfix-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

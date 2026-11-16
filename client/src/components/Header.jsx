@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTour } from '../contexts/TourContext';
@@ -237,17 +238,17 @@ export default function Header() {
         </div>
       </div>
 
-      {showTicketModal && (
-        <div className="modal-overlay" onClick={() => !sendingTicket && setShowTicketModal(false)}>
+      {showTicketModal && createPortal(
+        <div className="ticket-modal-overlay" onClick={() => !sendingTicket && setShowTicketModal(false)}>
           <div
-            className="modal-content ticket-modal animate-scale-in"
+            className="ticket-modal animate-scale-in"
             onClick={e => e.stopPropagation()}
           >
-            <div className="modal-header">
+            <div className="ticket-modal-header">
               <h3>🎫 Gerar Ticket — Suporte & Melhoria</h3>
               <button
                 type="button"
-                className="close-btn"
+                className="ticket-close-btn"
                 onClick={() => !sendingTicket && setShowTicketModal(false)}
               >
                 &times;
@@ -387,7 +388,8 @@ export default function Header() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

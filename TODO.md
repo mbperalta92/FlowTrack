@@ -41,6 +41,13 @@
   - [x] Código publicado no GitHub (`https://github.com/mbperalta92/FlowTrack.git`)
   - [x] Aplicação online em produção no endereço oficial: **[https://flowtrack-tgpx.onrender.com](https://flowtrack-tgpx.onrender.com)**
   - [x] Blindagem de segurança e privacidade ativa (bloqueio de motores de busca `noindex/nofollow`, `robots.txt`, autenticação JWT obrigatória, e dados guardados na conta privada `geral@repfix.pt`)
+- [x] **Rastreabilidade de N.º Processo Cliente / Ref.ª e Anexos na Abertura**
+  - [x] Campo dedicado `N.º Processo Cliente / Ref.ª` na criação e edição do processo, visível na tabela, cartões Kanban, topo do processo, e-mails automáticos e Google Calendar / Calendário FlowTrack
+  - [x] Possibilidade de anexar ficheiros logo na criação de um Novo Processo (com envio automático para a subpasta da Google Drive)
+- [x] **Sistema de Tickets de Suporte & Melhoria (`🎫 Gerar Ticket`)**
+  - [x] Botão `🎫 Gerar Ticket` no menu de perfil do utilizador (`Header.jsx` / `Header.css`)
+  - [x] Seleção de Tipo (`🐛 Bug / Erro` ou `💡 Oportunidade de Melhoria`), 9 Categorias, Nível de Impacto (`Baixo`, `Médio`, `Alto`), Descrição e Anexos/Prints
+  - [x] Envio direto para `geral@repfix.pt` com `mbperalta92@gmail.com` em CC e ficheiros anexados diretamente no e-mail (`server/routes/tickets.js`)
 
 ---
 
