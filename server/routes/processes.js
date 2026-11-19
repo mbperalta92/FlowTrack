@@ -917,4 +917,41 @@ router.get('/:id/export-attachments', authenticateToken, (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/processes/:id
+ * Permanently delete a process (Key User only).
+ * If no processes remain after deletion, resets the sequence counter so the next process starts at 1.
+ */
+router.delete('/:id', authenticateToken, requireRole('key_user'), async (req, res) => {
+  try {
+    const proc = db.prepare('SELECT * FROM processes WHERE id = ?').get(req.params.id);
+    if (!proc) {
+      return res.status(404).json({ error: 'Processo não encontrado.' });
+    }
+
+    // Remove associated Google Calendar event if present
+    if (proc.google_calendar_event_id) {
+      await syncProcessToGoogleCalendar({ ...proc, status: 'FECHADO' });
+    }
+
+    const delTx = db.transaction(() => {
+      db.prepare('DELETE FROM events WHERE process_id = ?').run(proc.id);
+      db.prepare('DELETE FROM notifications WHERE process_id = ?').run(proc.id);
+      db.prepare('DELETE FROM process_history WHERE process_id = ?').run(proc.id);
+      db.prepare('DELETE FROM processes WHERE id = ?').run(proc.id);
+
+      const remaining = db.prepare('SELECT COUNT(*) as c FROM processes').get().c;
+      if (remaining === 0) {
+        db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('processes', 'process_history', 'attachments', 'notifications', 'events', 'event_participants')").run();
+      }
+    });
+    delTx();
+
+    res.json({ message: `Processo ${proc.process_id} eliminado com sucesso.` });
+  } catch (err) {
+    console.error('Delete process error:', err);
+    res.status(500).json({ error: 'Erro ao eliminar processo.' });
+  }
+});
+
 export default router;

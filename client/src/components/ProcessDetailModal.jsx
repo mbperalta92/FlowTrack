@@ -27,7 +27,7 @@ function combineDateTime(datePart, timePart) {
 }
 
 export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isKeyUser } = useAuth();
   const [proc, setProc] = useState(null);
   const [history, setHistory] = useState([]);
   const [users, setUsers] = useState([]);
@@ -508,6 +508,33 @@ export default function ProcessDetailModal({ processId, onClose, onUpdate }) {
                 onClick={handleCloseProcess}
               >
                 Fechar Processo
+              </button>
+            )}
+
+            {/* DELETE ACTION (KEY USER ONLY) */}
+            {isKeyUser && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{
+                  marginTop: '10px',
+                  width: '100%',
+                  borderColor: 'rgba(239, 68, 68, 0.45)',
+                  color: '#f87171'
+                }}
+                onClick={async () => {
+                  if (!window.confirm(`Tem a certeza que pretende ELIMINAR permanentemente o processo ${proc.process_id}?`)) return;
+                  try {
+                    await api.delete(`/processes/${proc.id}`);
+                    toast.success(`Processo ${proc.process_id} eliminado!`);
+                    if (onUpdate) onUpdate();
+                    onClose();
+                  } catch (err) {
+                    toast.error(err.message || 'Erro ao eliminar processo.');
+                  }
+                }}
+              >
+                🗑️ Eliminar Processo (Key User)
               </button>
             )}
           </div>
